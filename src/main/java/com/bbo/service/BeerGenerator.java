@@ -3,6 +3,7 @@ package com.bbo.service;
 import com.bbo.model.Beer;
 import io.smallrye.mutiny.Multi;
 import io.smallrye.reactive.messaging.annotations.Blocking;
+import org.eclipse.microprofile.faulttolerance.Retry;
 import org.eclipse.microprofile.reactive.messaging.Incoming;
 import org.eclipse.microprofile.reactive.messaging.Outgoing;
 import org.eclipse.microprofile.rest.client.inject.RestClient;
@@ -11,12 +12,14 @@ import javax.enterprise.context.ApplicationScoped;
 import javax.json.bind.JsonbBuilder;
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Random;
 import java.util.concurrent.ThreadLocalRandom;
 
 @ApplicationScoped
 public class BeerGenerator {
-
+    private final Random random = new Random();
     @RestClient
     BeerService beerService;
 
@@ -31,17 +34,16 @@ public class BeerGenerator {
 
     @Incoming("beers")
     @Outgoing("groups")
-    public Multi<List<String>> skipGroup(Multi<String> stream) {
+    @Retry(maxRetries = 10, delay = 1, delayUnit = ChronoUnit.SECONDS)
+    public Multi<List<String>> group(Multi<String> stream) {
+        int i = random.nextInt(10);
+        System.out.println("Show retry  for random number "+i);
+        if (i > 1) {
+            throw new RuntimeException("not working");
+        }
         return stream.skip().first(Duration.ofMillis(10)).group().intoLists().of(5);
     }
 
-/*
-    @Incoming("groups")
-    @Outgoing("messages")
-    public String processGroup(List<String> list) {
-        return String.join(",", list.toString());
-    }
-*/
 
     @Incoming("groups")
     @Outgoing("messages")
@@ -56,10 +58,9 @@ public class BeerGenerator {
         return String.join(",", list.toString());
     }
 
-
     @Incoming("messages")
     public String print(String msg) {
-        System.out.println(msg);
+       // System.out.println(msg);
         return msg;
     }
 }
